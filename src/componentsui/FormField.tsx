@@ -50,8 +50,10 @@ export function FormField({
   className,
   ...props
 }: FormFieldProps) {
-  // Generate unique IDs for accessibility
-  const fieldId = `field-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  // Generate unique IDs for accessibility using React's useId hook
+  // This ensures stable IDs across server and client renders (no hydration mismatch)
+  const id = React.useId();
+  const fieldId = `field-${id}`;
   const descriptionId = `${fieldId}-description`;
   const errorId = `${fieldId}-error`;
 
