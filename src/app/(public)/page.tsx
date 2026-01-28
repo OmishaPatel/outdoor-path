@@ -1,4 +1,5 @@
 'use client';
+
 // Landing Page - Marketing hero page
 
 import Link from 'next/link';
@@ -8,8 +9,11 @@ import { EventCard } from '@/components/events/EventCard';
 import { Badge } from '@/components/ui/Badge';
 import { mockEvents } from '@/lib/mock';
 import { Mountain, Users, Calendar, Shield, Search } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 export default function LandingPage() {
+  const router = useRouter();
+
   // Get 3 featured upcoming events
   const featuredEvents = mockEvents
     .filter(e => e.status === 'active')
@@ -73,8 +77,8 @@ export default function LandingPage() {
                 showOrganizer
                 showCapacity
                 showImage
-                onClick={() => {}}
-                onRSVP={() => {}}
+                onClick={(eventId) => router.push(`/events/${eventId}`)}
+                onRSVP={(eventId) => router.push(`/events/${eventId}`)}
               />
             ))}
           </div>

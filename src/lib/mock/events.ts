@@ -226,7 +226,7 @@ export const searchEvents = (query: string): EventWithOrganizer[] => {
   const lowercaseQuery = query.toLowerCase();
   return mockEvents.filter(e =>
     e.title.toLowerCase().includes(lowercaseQuery) ||
-    e.description.toLowerCase().includes(lowercaseQuery) ||
+    e.description?.toLowerCase().includes(lowercaseQuery) ||
     e.location_name.toLowerCase().includes(lowercaseQuery)
   );
 };
