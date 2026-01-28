@@ -1,3 +1,5 @@
+'use client';
+
 // Public layout for non-authenticated pages
 // Includes Header + Footer + BottomNav
 
@@ -5,12 +7,15 @@ import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { Home, Search, Plus, User } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 export default function PublicLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const router = useRouter();
+
   // Navigation items for header
   const navItems = [
     { label: 'Browse Events', href: '/events', icon: <Search size={18} /> },
@@ -63,8 +68,8 @@ export default function PublicLayout({
       <Header
         navItems={navItems}
         user={null}
-        onLogin={() => {}}
-        onSignup={() => {}}
+        onLogin={() => router.push('/login')}
+        onSignup={() => router.push('/signup')}
         variant="solid"
         position="sticky"
       />
