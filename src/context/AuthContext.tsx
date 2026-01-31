@@ -1,19 +1,20 @@
 'use client';
 
-// Mock authentication context for Phase 4 development
-// TODO: Phase 5 - Replace with Supabase auth
+// Supabase authentication context for Phase 5
+// Supports OAuth (Google, Facebook, Apple)
 
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { createClient } from '@/lib/supabase/client';
+import { User, Session } from '@supabase/supabase-js';
 import { Profile } from '@/types/user';
-import { mockCurrentUser, getUserByEmail } from '@/lib/mock';
 
 interface AuthContextType {
   user: Profile | null;
+  session: Session | null;
   loading: boolean;
   isOrganizer: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string, fullName: string) => Promise<void>;
-  logout: () => void;
+  signInWithOAuth: (provider: 'google' | 'facebook' | 'apple') => Promise<void>;
+  signOut: () => Promise<void>;
   updateProfile: (data: Partial<Profile>) => Promise<void>;
 }
 
@@ -27,137 +28,101 @@ export function AuthProvider({
   initialUser?: Profile | null;
 }) {
   const [user, setUser] = useState<Profile | null>(initialUser);
-  const [loading, setLoading] = useState(false);
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
+  const supabase = createClient();
 
-  // Load user from localStorage on mount (simulate session persistence)
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storedUser = localStorage.getItem('mock_auth_user');
-      if (storedUser) {
-        try {
-          setUser(JSON.parse(storedUser));
-        } catch (e) {
-          console.error('Failed to parse stored user:', e);
-          localStorage.removeItem('mock_auth_user');
-        }
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session?.user) {
+        fetchProfile(session.user.id);
+      } else {
+        setLoading(false);
       }
-    }
+    });
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session?.user) {
+        fetchProfile(session.user.id);
+      } else {
+        setUser(null);
+        setLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const login = async (email: string, password: string) => {
-    setLoading(true);
+  const fetchProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
 
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
+      if (error) {
+        console.error('Error fetching profile:', error);
+        setLoading(false);
+        return;
+      }
 
-    // Mock validation: Check if user exists in mock data
-    const foundUser = getUserByEmail(email);
-
-    if (!foundUser) {
+      if (data) {
+        setUser(data);
+      }
       setLoading(false);
-      throw new Error('Invalid email or password');
-    }
-
-    // Mock password check (in Phase 4, accept any password)
-    if (!password || password.length < 1) {
+    } catch (error) {
+      console.error('Error in fetchProfile:', error);
       setLoading(false);
-      throw new Error('Password is required');
     }
-
-    setUser(foundUser);
-
-    // Persist to localStorage
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('mock_auth_user', JSON.stringify(foundUser));
-    }
-
-    setLoading(false);
   };
 
-  const signup = async (email: string, password: string, fullName: string) => {
-    setLoading(true);
+  const signInWithOAuth = async (provider: 'google' | 'facebook' | 'apple') => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
 
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    // Basic validation
-    if (!email || !email.includes('@')) {
-      setLoading(false);
-      throw new Error('Invalid email address');
+    if (error) {
+      console.error('OAuth sign in error:', error);
+      throw error;
     }
-
-    if (!password || password.length < 6) {
-      setLoading(false);
-      throw new Error('Password must be at least 6 characters');
-    }
-
-    if (!fullName || fullName.trim().length < 2) {
-      setLoading(false);
-      throw new Error('Full name is required');
-    }
-
-    // Check if user already exists
-    const existingUser = getUserByEmail(email);
-    if (existingUser) {
-      setLoading(false);
-      throw new Error('An account with this email already exists');
-    }
-
-    // Create new mock user
-    const newUser: Profile = {
-      id: `user-${Date.now()}`,
-      email,
-      full_name: fullName,
-      avatar_url: undefined,
-      role: 'member',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
-    setUser(newUser);
-
-    // Persist to localStorage
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('mock_auth_user', JSON.stringify(newUser));
-    }
-
-    setLoading(false);
   };
 
-  const logout = () => {
+  const signOut = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      console.error('Sign out error:', error);
+      throw error;
+    }
     setUser(null);
-
-    // Clear localStorage
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('mock_auth_user');
-    }
+    setSession(null);
   };
 
   const updateProfile = async (data: Partial<Profile>) => {
-    setLoading(true);
-
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-
     if (!user) {
-      setLoading(false);
       throw new Error('No user logged in');
     }
 
-    const updatedUser = {
-      ...user,
-      ...data,
-      updated_at: new Date().toISOString(),
-    };
+    const { error } = await supabase
+      .from('profiles')
+      .update(data)
+      .eq('id', user.id);
 
-    setUser(updatedUser);
-
-    // Update localStorage
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('mock_auth_user', JSON.stringify(updatedUser));
+    if (error) {
+      console.error('Update profile error:', error);
+      throw error;
     }
 
-    setLoading(false);
+    setUser({ ...user, ...data });
   };
 
   const isOrganizer = user?.role === 'organizer';
@@ -166,11 +131,11 @@ export function AuthProvider({
     <AuthContext.Provider
       value={{
         user,
+        session,
         loading,
         isOrganizer,
-        login,
-        signup,
-        logout,
+        signInWithOAuth,
+        signOut,
         updateProfile,
       }}
     >
